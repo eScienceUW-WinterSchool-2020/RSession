@@ -146,6 +146,113 @@ fromPy%>%
 ```
 
 
+
+## Unsupervised ML: Dimensionality Reduction
+
+You would like turn the 5 dimensions into one, without following an arithmetic approach, but an algebraic one, instead. Dimension reduction is the job of latent variable analysis, and that's the way proposed here.
+
+
+Let me subset our original data frame:
+```{r, eval=FALSE}
+subDemo=fromPy[,c(8:12)]
+```
+
+
+Our *subDemo* DF has the data to compute the one index we need. Let me use a technique called **confirmatory factor analysis**:
+
+```{r}
+names(subDemo)
+```
+
+
+```{r, eval=FALSE}
+library(lavaan)
+
+model='
+democracy=~Electoralprocessandpluralism + Functioningofgovernment + Politicalparticipation + Politicalculture + Civilliberties
+'
+
+fitNUM<-cfa(model, data = subDemo,std.lv=TRUE)
+indexCFA=lavPredict(fitNUM)
+```
+
+The index computed is not in a range from 1 to 10:
+```{r}
+head(indexCFA,20)
+```
+
+
+We force its return to 0 to 10:
+
+```{r, eval=FALSE}
+library(BBmisc)
+indexCFANorm=normalize(indexCFA, 
+                       method = "range", 
+                       margin=2, # by column
+                       range = c(0, 10))
+```
+
+
+So, this is our index:
+```{r, eval=FALSE}
+fromPy$dem_FA=indexCFANorm
+```
+
+Let me plot the new variable
+```{r, eval=FALSE}
+base=ggplot(data=fromPy)
+base + geom_histogram(aes(x=dem_FA))
+```
+
+Or:
+```{r}
+base + geom_boxplot(aes(y=dem_FA))
+```
+
+
+Let me see some evaluation measures of our index for democracy:
+
+```{r}
+evalCFA1=parameterEstimates(fitNUM, standardized =TRUE)
+```
+
+* Loadings
+```{r,echo=FALSE}
+evalCFA1[evalCFA1$op=="=~",c('rhs','std.all','pvalue')]
+```
+
+* Some coefficients:
+
+```{r, echo=FALSE}
+evalCFA2=as.list(fitMeasures(fitNUM))
+```
+
+* You want p.value greater than 0.05:
+
+```{r}
+evalCFA2[c("chisq", "df", "pvalue")] 
+```
+
+* You want the Tucker-Lewis > 0.9:
+
+```{r,echo=FALSE}
+evalCFA2$tli # > 0.90
+```
+
+* You want RMSEA < 0.05:
+
+```{r,echo=FALSE}
+evalCFA2[c( 'rmsea.ci.lower','rmsea','rmsea.ci.upper')] 
+```
+
+You can see how it looks:
+
+```{r, echo=FALSE}
+library(semPlot)
+semPaths(fitNUM, what='std', nCharNodes=10, sizeMan=8,
+         edge.label.cex=1.5, fade=T,residuals = F)
+```
+
 ## Unsupervised ML: Clustering via partitioning
 
 ### Part 1: Preparing data
@@ -281,110 +388,16 @@ library(ggpubr)
 ggarrange(sil1,sil2,ncol = 1)
 ```
 
+We should see how the world likes like based on democracy clusters, follow this steps:
 
-## Unsupervised ML: Dimensionality Reduction
-
-You would like turn the 5 dimensions into one, without following an arithmetic approach, but an algebraic one, instead. Dimension reduction is the job of latent variable analysis, and that's the way proposed here.
-
-
-Let me subset our original data frame:
-```{r, eval=FALSE}
-subDemo=fromPy[,c(8:12)]
-```
+a. Download the world map from [here](https://github.com/eScienceUW-WinterSchool-2020/RSession/raw/master/map/world_map.zip).
+b. Unzip the file you downloaded in a folder.
+c. Upload the unzipped files into [MAPSHAPER](https://mapshaper.org/). No need to uplod the text file.
+d. Transform the map into a TOPOJSON format. Save the topojson into your computer.
+e. Get a github account. Create a repository and upload the topojson file.
+f. Get the download link and use it in the next code.
 
 
 
-Our *subDemo* DF has the data to compute the one index we need. Let me use a technique called **confirmatory factor analysis**:
-
-```{r}
-names(subDemo)
-```
 
 
-```{r, eval=FALSE}
-library(lavaan)
-
-model='
-democracy=~Electoralprocessandpluralism + Functioningofgovernment + Politicalparticipation + Politicalculture + Civilliberties
-'
-
-fitNUM<-cfa(model, data = subDemo,std.lv=TRUE)
-indexCFA=lavPredict(fitNUM)
-```
-
-The index computed is not in a range from 1 to 10:
-```{r}
-head(indexCFA,20)
-```
-
-
-We force its return to 0 to 10:
-
-```{r, eval=FALSE}
-library(BBmisc)
-indexCFANorm=normalize(indexCFA, 
-                       method = "range", 
-                       margin=2, # by column
-                       range = c(0, 10))
-```
-
-
-So, this is our index:
-```{r, eval=FALSE}
-fromPy$dem_FA=indexCFANorm
-```
-
-Let me plot the new variable
-```{r, eval=FALSE}
-base=ggplot(data=fromPy)
-base + geom_histogram(aes(x=dem_FA))
-```
-
-Or:
-```{r}
-base + geom_boxplot(aes(y=dem_FA))
-```
-
-
-Let me see some evaluation measures of our index for democracy:
-
-```{r}
-evalCFA1=parameterEstimates(fitNUM, standardized =TRUE)
-```
-
-* Loadings
-```{r,echo=FALSE}
-evalCFA1[evalCFA1$op=="=~",c('rhs','std.all','pvalue')]
-```
-
-* Some coefficients:
-
-```{r, echo=FALSE}
-evalCFA2=as.list(fitMeasures(fitNUM))
-```
-
-* You want p.value greater than 0.05:
-
-```{r}
-evalCFA2[c("chisq", "df", "pvalue")] 
-```
-
-* You want the Tucker-Lewis > 0.9:
-
-```{r,echo=FALSE}
-evalCFA2$tli # > 0.90
-```
-
-* You want RMSEA < 0.05:
-
-```{r,echo=FALSE}
-evalCFA2[c( 'rmsea.ci.lower','rmsea','rmsea.ci.upper')] 
-```
-
-You can see how it looks:
-
-```{r, echo=FALSE}
-library(semPlot)
-semPaths(fitNUM, what='std', nCharNodes=10, sizeMan=8,
-         edge.label.cex=1.5, fade=T,residuals = F)
-```
