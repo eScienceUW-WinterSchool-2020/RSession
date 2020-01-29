@@ -1,0 +1,365 @@
+<br> 
+<center><img src="https://i.imgur.com/hkb7Bq7.png" width="500"></center>
+
+
+### Prof. José Manuel Magallanes, PhD
+
+* Associate Professor, Departamento de Ciencias Sociales, Pontificia Universidad Católica del Perú, [jmagallanes@pucp.edu.pe](mailto:jmagallanes@pucp.edu.pe)
+
+* Visiting Associate Professor, Evans School of Public Policy and Governance / Senior Data Science Fellow, eScience Institute, University of Washington, [magajm@uw.edu](mailto:magajm@uw.edu)
+_____
+
+Session 2: Introduction to R.
+_____
+
+# The data frame in R
+
+## Collecting data:
+
+Let's collect the file we created in Python:
+
+```{r}
+# the location
+MyFile='https://github.com/UWDataScience2020/data/raw/master/hdidemocia.RDS'
+
+# if location is website:
+MyFile=url(MyFile)
+
+# get the data:
+fromPy=readRDS(file = 'hdidemocia.RDS') # no need for a library
+row.names(fromPy)=NULL   # reset indexes from Python.
+```
+
+Always check the data types:
+
+```{r}
+str(fromPy)  # less space: width = 70,strict.width='cut'
+```
+
+
+## Querying data frames:
+
+* What is the country with highest HDI?
+```{r}
+# you could get more than one
+fromPy[fromPy$Humandevelopmentindex==max(fromPy$Humandevelopmentindex),]
+```
+
+```{r}
+#or
+fromPy[fromPy$Humandevelopmentindex==max(fromPy$Humandevelopmentindex),'Country']
+```
+
+You also have:
+```{r}
+#or
+fromPy[which.max(fromPy$Humandevelopmentindex),'Country']
+```
+
+* What is the country with highest HDI in America?
+
+```{r}
+# from AMERICA:
+AMERICA=c('South America','North America')
+subAmerica=fromPy[fromPy$Continent %in% AMERICA,]
+subAmerica[which.max(subAmerica$Humandevelopmentindex),'Country']
+```
+
+```{r}
+library(magrittr)
+library(dplyr)
+
+fromPy%>%
+    filter(Continent %in% AMERICA)%>%
+    filter(Humandevelopmentindex==max(Humandevelopmentindex))%>%
+    select(Country)
+```
+
+* What is the country with highest HDI not from America?
+
+```{r}
+# from AMERICA:
+AMERICA=c('South America','North America')
+subNotAmerica=fromPy[!fromPy$Continent %in% AMERICA,]
+subNotAmerica[which.max(subNotAmerica$Humandevelopmentindex),'Country']
+```
+
+
+```{r}
+fromPy%>%
+    filter(!Continent %in% AMERICA)%>%
+    filter(Humandevelopmentindex==max(Humandevelopmentindex))%>%
+    select(Country)
+```
+
+## Aggregating data frames:
+
+The average HDI per continent:
+
+```{r}
+aggregate(data=fromPy,Humandevelopmentindex ~ Continent,FUN=mean)
+```
+```{r}
+fromPy%>%
+    group_by(Continent) %>% 
+    summarise(meanHDI = mean(Humandevelopmentindex))
+```
+
+The median of the democracy components:
+
+```{r}
+aggregate(data=fromPy,
+          cbind(Electoralprocessandpluralism,Functioningofgovernment,
+                Politicalparticipation,Politicalculture,
+                Civilliberties)~Continent,
+          FUN=median)
+
+```
+```{r}
+aggregate(data=fromPy[,c(7:11,13)],.~Continent,FUN=median)
+```
+
+```{r}
+fromPy[,c(7:11,13)]%>%
+    group_by(Continent) %>% 
+    summarise_all(list(median))
+```
+
+
+## Creating new data:
+
+One column:
+
+```{r}
+fromPy$HDIdico=ifelse(fromPy$Humandevelopmentindex>
+                          median(fromPy$Humandevelopmentindex),
+                      1,0)
+```
+
+A new data frame:
+```{r}
+fromPy%>%
+    mutate(HDIdico = ifelse(Humandevelopmentindex>median(Humandevelopmentindex),
+                            1, 0))%>%
+    select(Country,HDIdico)
+```
+
+
+## Unsupervised ML: Clustering via partitioning
+
+### Part 1: Preparing data
+
+**a.** Subset the data frame:
+
+```{r}
+dfClus=fromPy[,c(2,12,15)]
+```
+
+
+**b.** Rename the rows:
+```{r}
+#from
+head(dfClus)
+```
+
+```{r}
+#to
+row.names(dfClus)=fromPy$Country
+head(dfClus)
+```
+
+**c.** Keep only complete data:
+
+
+```{r}
+dfClus=dfClus[complete.cases(dfClus),]
+```
+
+
+**d.** Decide distance method and compute distance matrix:
+```{r}
+library(cluster)
+dfClus_D=cluster::daisy(x=dfClus,metric="gower")
+```
+
+
+### Part 2: Clustering
+
+### 1. Apply function: you need to indicate the amount of clusters required.
+
+```{r}
+res.pam = pam(x=dfClus_D,k = 5,cluster.only = F)
+```
+
+
+### 2. Save clustering results. 
+
+```{r}
+dfClus$pam=as.factor(res.pam$clustering)
+```
+
+You can see who are the members:
+
+```{r}
+row.names(dfClus[dfClus$pam==1,])
+```
+
+You can request belonging:
+
+```{r}
+dfClus[row.names(dfClus)=="Peru",'pam']
+```
+
+
+### 3. Evaluate Results.
+
+**3.a** Global and visual report
+
+```{r}
+library(factoextra)
+fviz_silhouette(res.pam)
+```
+
+**3.b** Individual report
+
+```{r}
+pamEval=data.frame(res.pam$silinfo$widths)
+head(pamEval)
+```
+
+**3.c** Detecting anomalies
+
+```{r}
+pamEval[pamEval$sil_width<0,]
+```
+
+
+
+### <font color="red">Dimensionality Reduction</font>
+
+You would like turn the 5 dimensions into one, without following an arithmetic approach, but an algebraic one, instead. Dimension reduction is the job of latent variable analysis, and that's the way proposed here.
+
+Let me first create some fake columns that represent values I do not have:
+```{r, eval=FALSE}
+library(matlab)
+top=10*as.vector(ones(1,5))
+bottom=as.vector(zeros(1,5))
+# those become two rows of a data frame
+limitCases=as.data.frame(rbind(bottom,top))
+limitCases
+```
+
+I have create a two-row data frame only because the original data do not have those values.
+
+Let me subset our original data frame:
+```{r, eval=FALSE}
+subDemo=fromPy[,c(7:11)]
+```
+
+Now Let me append the small one to this last one.
+
+```{r, eval=FALSE}
+# FIRST, we need both DFs share same column names
+names(limitCases)=names(subDemo)
+# appending:
+subDemo=rbind(subDemo,limitCases)
+```
+
+Our *subDemo* DF has the data to compute the one index we need. I will show you two ways:
+
+1. **When all are considered numerical**:
+
+This technique is called **confirmatory factor analysis**:
+
+```{r}
+names(subDemo)
+```
+
+
+```{r, eval=FALSE}
+library(lavaan)
+
+model='
+dem=~Electoralprocessandpluralism + Functioningofgovernment + Politicalparticipation + Politicalculture + Civilliberties
+'
+
+fitNUM<-cfa(model, data = subDemo)
+indexCFA=lavPredict(fitNUM)
+```
+
+The index computed is not in a range from 1 to 10:
+```{r}
+indexCFA
+```
+
+
+We force its return to 0 to 10:
+
+```{r, eval=FALSE}
+library(BBmisc)
+indexCFANorm=normalize(indexCFA, 
+                       method = "range", 
+                       margin=2, # by column
+                       range = c(0, 10))
+```
+
+The last rows need to be eliminated:
+```{r, eval=FALSE}
+tail(indexCFANorm)
+```
+
+So, this is our index:
+```{r, eval=FALSE}
+fromPy$dem_FA=head(indexCFANorm,-2)
+```
+
+Let me compare the new index with the original score:
+```{r, eval=FALSE}
+fromPy$ScoreDemo=apply(fromPy[,c(7:11)],1,mean)
+plot(fromPy$ScoreDemo,fromPy$dem_FA)
+```
+
+2. **When all are considered ordinal**:
+
+In this case we will use PIRT:Polytomous Item Response Theory.
+```{r, eval=FALSE}
+library(mirt)
+
+tempDemo2=floor(fromPy[,c(7:11)]) # keeping the integer
+tempDemo2=rbind(tempDemo2,limitCases)
+model2='
+dem=Electoralprocessandpluralism,Functioningofgovernment,
+Politicalparticipation, Politicalculture, Civilliberties
+'
+fitORD <- mirt(data=tempDemo2, 
+               model=model2, 
+               itemtype="graded",verbose=F)
+indexPIRT <- fscores(fitORD,response.pattern = tempDemo2)[,'F1']
+```
+```{r}
+indexPIRT
+```
+
+Again, we make the changes to our index:
+```{r, eval=FALSE}
+# rescale
+indexPIRTNorm=normalize(indexPIRT, method = "range", margin=2,range = c(0, 10))
+#
+# keep values needed
+fromPy$demo_PIRT=head(indexPIRTNorm,-2)
+```
+
+Let me compare the new index with the original score:
+
+```{r, eval=FALSE}
+plot(fromPy$demo_PIRT,fromPy$ScoreDemo)
+```
+
+You can see them all here:
+
+```{r, eval=FALSE}
+plot(fromPy[,c("ScoreDemo","dem_FA","demo_PIRT")])
+```
+
+
+
