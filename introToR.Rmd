@@ -20,13 +20,14 @@ Let's collect the file we created in Python:
 
 ```{r}
 # the location
-MyFile='https://github.com/UWDataScience2020/data/raw/master/hdidemocia.RDS'
+MyFile='https://github.com/eScienceUW-WinterSchool-2020/RSession/raw/master/hdidemocia.RDS'
+
 
 # if location is website:
 MyFile=url(MyFile)
 
 # get the data:
-fromPy=readRDS(file = 'hdidemocia.RDS') # no need for a library
+fromPy=readRDS(file = MyFile) # no need for a library
 row.names(fromPy)=NULL   # reset indexes from Python.
 ```
 
@@ -116,11 +117,11 @@ aggregate(data=fromPy,
 
 ```
 ```{r}
-aggregate(data=fromPy[,c(7:11,13)],.~Continent,FUN=median)
+aggregate(data=fromPy[,c(8:12,14)],.~Continent,FUN=median)
 ```
 
 ```{r}
-fromPy[,c(7:11,13)]%>%
+fromPy[,c(8:12,14)]%>%
     group_by(Continent) %>% 
     summarise_all(list(median))
 ```
@@ -152,7 +153,7 @@ fromPy%>%
 **a.** Subset the data frame:
 
 ```{r}
-dfClus=fromPy[,c(2,12,15)]
+dfClus=fromPy[,c(2,13,16)]
 ```
 
 
@@ -183,11 +184,12 @@ dfClus_D=cluster::daisy(x=dfClus,metric="gower")
 ```
 
 
-### Part 2: Clustering
+### Part 2: Clustering process
 
 ### 1. Apply function: you need to indicate the amount of clusters required.
 
 ```{r}
+set.seed(123)
 res.pam = pam(x=dfClus_D,k = 5,cluster.only = F)
 ```
 
@@ -213,17 +215,21 @@ dfClus[row.names(dfClus)=="Peru",'pam']
 
 ### 3. Evaluate Results.
 
-**3.a** Global and visual report
+**3.a** Global Report
+
 
 ```{r}
-library(factoextra)
-fviz_silhouette(res.pam)
+pamEval=as.data.frame.array(silhouette(res.pam))
+pamEval$country=row.names(pamEval)
+row.names(pamEval)=NULL
+aggregate(data=pamEval,sil_width~cluster,FUN=mean)
 ```
+
+
 
 **3.b** Individual report
 
 ```{r}
-pamEval=data.frame(res.pam$silinfo$widths)
 head(pamEval)
 ```
 
@@ -233,43 +239,62 @@ head(pamEval)
 pamEval[pamEval$sil_width<0,]
 ```
 
+```{r}
+pamEval_O=pamEval[order(pamEval$cluster,pamEval$sil_width),]
+```
+
+```{r}
+library(ggplot2)
+
+clusterVal=1
+pamEval=pamEval_O[pamEval_O$cluster==clusterVal,]
+
+base=ggplot(data=pamEval,
+             aes(x=country,
+                 y=sil_width))
+sil1= base + geom_bar(stat='identity')
+sil1= sil1 + scale_x_discrete(limits=pamEval$country)
+sil1= sil1 + theme(axis.text.x = element_text(angle = 80,
+                                              size = 6,
+                                              hjust = 1))
+sil1
+```
+```{r}
+clusterVal=2
+pamEval=pamEval_O[pamEval_O$cluster==clusterVal,]
+
+base=ggplot(data=pamEval,
+             aes(x=country,
+                 y=sil_width))
+sil2= base + geom_bar(stat='identity',fill='grey')
+sil2= sil2 + scale_x_discrete(limits=pamEval$country)
+sil2= sil2 + theme(axis.text.x = element_text(angle = 80,
+                                              size = 6,
+                                              hjust = 1))
+sil2= sil2 + labs(x=NULL)
+sil2
+```
+
+```{r}
+library(ggpubr)
+
+ggarrange(sil1,sil2,ncol = 1)
+```
 
 
-### <font color="red">Dimensionality Reduction</font>
+## Unsupervised ML: Dimensionality Reduction
 
 You would like turn the 5 dimensions into one, without following an arithmetic approach, but an algebraic one, instead. Dimension reduction is the job of latent variable analysis, and that's the way proposed here.
 
-Let me first create some fake columns that represent values I do not have:
-```{r, eval=FALSE}
-library(matlab)
-top=10*as.vector(ones(1,5))
-bottom=as.vector(zeros(1,5))
-# those become two rows of a data frame
-limitCases=as.data.frame(rbind(bottom,top))
-limitCases
-```
-
-I have create a two-row data frame only because the original data do not have those values.
 
 Let me subset our original data frame:
 ```{r, eval=FALSE}
-subDemo=fromPy[,c(7:11)]
+subDemo=fromPy[,c(8:12)]
 ```
 
-Now Let me append the small one to this last one.
 
-```{r, eval=FALSE}
-# FIRST, we need both DFs share same column names
-names(limitCases)=names(subDemo)
-# appending:
-subDemo=rbind(subDemo,limitCases)
-```
 
-Our *subDemo* DF has the data to compute the one index we need. I will show you two ways:
-
-1. **When all are considered numerical**:
-
-This technique is called **confirmatory factor analysis**:
+Our *subDemo* DF has the data to compute the one index we need. Let me use a technique called **confirmatory factor analysis**:
 
 ```{r}
 names(subDemo)
@@ -280,16 +305,16 @@ names(subDemo)
 library(lavaan)
 
 model='
-dem=~Electoralprocessandpluralism + Functioningofgovernment + Politicalparticipation + Politicalculture + Civilliberties
+democracy=~Electoralprocessandpluralism + Functioningofgovernment + Politicalparticipation + Politicalculture + Civilliberties
 '
 
-fitNUM<-cfa(model, data = subDemo)
+fitNUM<-cfa(model, data = subDemo,std.lv=TRUE)
 indexCFA=lavPredict(fitNUM)
 ```
 
 The index computed is not in a range from 1 to 10:
 ```{r}
-indexCFA
+head(indexCFA,20)
 ```
 
 
@@ -303,63 +328,63 @@ indexCFANorm=normalize(indexCFA,
                        range = c(0, 10))
 ```
 
-The last rows need to be eliminated:
-```{r, eval=FALSE}
-tail(indexCFANorm)
-```
 
 So, this is our index:
 ```{r, eval=FALSE}
-fromPy$dem_FA=head(indexCFANorm,-2)
+fromPy$dem_FA=indexCFANorm
 ```
 
-Let me compare the new index with the original score:
+Let me plot the new variable
 ```{r, eval=FALSE}
-fromPy$ScoreDemo=apply(fromPy[,c(7:11)],1,mean)
-plot(fromPy$ScoreDemo,fromPy$dem_FA)
+base=ggplot(data=fromPy)
+base + geom_histogram(aes(x=dem_FA))
 ```
 
-2. **When all are considered ordinal**:
-
-In this case we will use PIRT:Polytomous Item Response Theory.
-```{r, eval=FALSE}
-library(mirt)
-
-tempDemo2=floor(fromPy[,c(7:11)]) # keeping the integer
-tempDemo2=rbind(tempDemo2,limitCases)
-model2='
-dem=Electoralprocessandpluralism,Functioningofgovernment,
-Politicalparticipation, Politicalculture, Civilliberties
-'
-fitORD <- mirt(data=tempDemo2, 
-               model=model2, 
-               itemtype="graded",verbose=F)
-indexPIRT <- fscores(fitORD,response.pattern = tempDemo2)[,'F1']
-```
+Or:
 ```{r}
-indexPIRT
-```
-
-Again, we make the changes to our index:
-```{r, eval=FALSE}
-# rescale
-indexPIRTNorm=normalize(indexPIRT, method = "range", margin=2,range = c(0, 10))
-#
-# keep values needed
-fromPy$demo_PIRT=head(indexPIRTNorm,-2)
-```
-
-Let me compare the new index with the original score:
-
-```{r, eval=FALSE}
-plot(fromPy$demo_PIRT,fromPy$ScoreDemo)
-```
-
-You can see them all here:
-
-```{r, eval=FALSE}
-plot(fromPy[,c("ScoreDemo","dem_FA","demo_PIRT")])
+base + geom_boxplot(aes(y=dem_FA))
 ```
 
 
+Let me see some evaluation measures of our index for democracy:
 
+```{r}
+evalCFA1=parameterEstimates(fitNUM, standardized =TRUE)
+```
+
+* Loadings
+```{r,echo=FALSE}
+evalCFA1[evalCFA1$op=="=~",c('rhs','std.all','pvalue')]
+```
+
+* Some coefficients:
+
+```{r, echo=FALSE}
+evalCFA2=as.list(fitMeasures(fitNUM))
+```
+
+* You want p.value greater than 0.05:
+
+```{r}
+evalCFA2[c("chisq", "df", "pvalue")] 
+```
+
+* You want the Tucker-Lewis > 0.9:
+
+```{r,echo=FALSE}
+evalCFA2$tli # > 0.90
+```
+
+* You want RMSEA < 0.05:
+
+```{r,echo=FALSE}
+evalCFA2[c( 'rmsea.ci.lower','rmsea','rmsea.ci.upper')] 
+```
+
+You can see how it looks:
+
+```{r, echo=FALSE}
+library(semPlot)
+semPaths(fitNUM, what='std', nCharNodes=10, sizeMan=8,
+         edge.label.cex=1.5, fade=T,residuals = F)
+```
