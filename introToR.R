@@ -1,27 +1,4 @@
-<br> 
-<center><img src="https://i.imgur.com/hkb7Bq7.png" width="500"></center>
-
-
-### Prof. José Manuel Magallanes, PhD
-
-* Associate Professor, Departamento de Ciencias Sociales, Pontificia Universidad Católica del Perú, [jmagallanes@pucp.edu.pe](mailto:jmagallanes@pucp.edu.pe)
-
-* Visiting Associate Professor, Evans School of Public Policy and Governance / Senior Data Science Fellow, eScience Institute, University of Washington, [magajm@uw.edu](mailto:magajm@uw.edu)
-
-_____
-
-
-# Session 2: Introduction to R.
-
-_____
-
-# The data frame in R
-
-## Collecting data:
-
-Let's collect the file we created in Python:
-
-```{r}
+## ------------------------------------------------------------------------
 # the location
 MyFile='https://github.com/eScienceUW-WinterSchool-2020/RSession/raw/master/hdidemocia.RDS'
 
@@ -32,44 +9,35 @@ MyFile=url(MyFile)
 # get the data:
 fromPy=readRDS(file = MyFile) # no need for a library
 row.names(fromPy)=NULL   # reset indexes from Python.
-```
 
-Always check the data types:
 
-```{r}
+## ------------------------------------------------------------------------
 str(fromPy)  # less space: width = 70,strict.width='cut'
-```
 
 
-## Querying data frames:
-
-* What is the country with highest HDI?
-```{r}
+## ------------------------------------------------------------------------
 # you could get more than one
 fromPy[fromPy$Humandevelopmentindex==max(fromPy$Humandevelopmentindex),]
-```
 
-```{r}
+
+## ------------------------------------------------------------------------
 #or
 fromPy[fromPy$Humandevelopmentindex==max(fromPy$Humandevelopmentindex),'Country']
-```
 
-You also have:
-```{r}
+
+## ------------------------------------------------------------------------
 #or
 fromPy[which.max(fromPy$Humandevelopmentindex),'Country']
-```
 
-* What is the country with highest HDI in America?
 
-```{r}
+## ------------------------------------------------------------------------
 # from AMERICA:
 AMERICA=c('South America','North America')
 subAmerica=fromPy[fromPy$Continent %in% AMERICA,]
 subAmerica[which.max(subAmerica$Humandevelopmentindex),'Country']
-```
 
-```{r}
+
+## ------------------------------------------------------------------------
 library(magrittr)
 library(dplyr)
 
@@ -77,98 +45,71 @@ fromPy%>%
     filter(Continent %in% AMERICA)%>%
     filter(Humandevelopmentindex==max(Humandevelopmentindex))%>%
     select(Country)
-```
 
-* What is the country with highest HDI not from America?
 
-```{r}
+## ------------------------------------------------------------------------
 # from AMERICA:
 AMERICA=c('South America','North America')
 subNotAmerica=fromPy[!fromPy$Continent %in% AMERICA,]
 subNotAmerica[which.max(subNotAmerica$Humandevelopmentindex),'Country']
-```
 
 
-```{r}
+## ------------------------------------------------------------------------
 fromPy%>%
     filter(!Continent %in% AMERICA)%>%
     filter(Humandevelopmentindex==max(Humandevelopmentindex))%>%
     select(Country)
-```
 
-## Aggregating data frames:
 
-The average HDI per continent:
-
-```{r}
+## ------------------------------------------------------------------------
 aggregate(data=fromPy,Humandevelopmentindex ~ Continent,FUN=mean)
-```
-```{r}
+
+## ------------------------------------------------------------------------
 fromPy%>%
     group_by(Continent) %>% 
     summarise(meanHDI = mean(Humandevelopmentindex))
-```
 
-The median of the democracy components:
 
-```{r}
+## ------------------------------------------------------------------------
 aggregate(data=fromPy,
           cbind(Electoralprocessandpluralism,Functioningofgovernment,
                 Politicalparticipation,Politicalculture,
                 Civilliberties)~Continent,
           FUN=median)
 
-```
-```{r}
-aggregate(data=fromPy[,c(8:12,14)],.~Continent,FUN=median)
-```
 
-```{r}
+## ------------------------------------------------------------------------
+aggregate(data=fromPy[,c(8:12,14)],.~Continent,FUN=median)
+
+
+## ------------------------------------------------------------------------
 fromPy[,c(8:12,14)]%>%
     group_by(Continent) %>% 
     summarise_all(list(median))
-```
 
 
-## Creating new data:
-
-One column:
-
-```{r}
+## ------------------------------------------------------------------------
 fromPy$HDIdico=ifelse(fromPy$Humandevelopmentindex>
                           median(fromPy$Humandevelopmentindex),
                       1,0)
-```
 
-A new data frame:
-```{r}
+
+## ------------------------------------------------------------------------
 fromPy%>%
     mutate(HDIdico = ifelse(Humandevelopmentindex>median(Humandevelopmentindex),
                             1, 0))%>%
     select(Country,HDIdico)
-```
 
 
-
-## Unsupervised ML: Dimensionality Reduction
-
-You would like turn the 5 dimensions into one, without following an arithmetic approach, but an algebraic one, instead. Dimension reduction is the job of latent variable analysis, and that's the way proposed here.
-
-
-Let me subset our original data frame:
-```{r, eval=TRUE}
+## ---- eval=TRUE----------------------------------------------------------
 subDemo=fromPy[,c(8:12)]
-```
 
 
-Our *subDemo* DF has the data to compute the one index we need. Let me use a technique called **confirmatory factor analysis**:
-
-```{r}
+## ------------------------------------------------------------------------
 names(subDemo)
-```
 
 
-```{r, eval=TRUE}
+## ---- eval=TRUE----------------------------------------------------------
 library(lavaan)
 
 model='
@@ -177,186 +118,127 @@ democracy=~Electoralprocessandpluralism + Functioningofgovernment + Politicalpar
 
 fitNUM<-cfa(model, data = subDemo,std.lv=TRUE)
 indexCFA=lavPredict(fitNUM)
-```
 
-The index computed is not in a range from 1 to 10:
-```{r}
+
+## ------------------------------------------------------------------------
 head(indexCFA,20)
-```
 
 
-We force its return to 0 to 10:
-
-```{r, eval=TRUE}
+## ---- eval=TRUE----------------------------------------------------------
 library(BBmisc)
 indexCFANorm=normalize(indexCFA, 
                        method = "range", 
                        margin=2, # by column
                        range = c(0, 10))
-```
 
 
-So, this is our index:
-```{r, eval=TRUE}
+## ---- eval=TRUE----------------------------------------------------------
 fromPy$dem_FA=as.vector(indexCFANorm)
-```
 
-Let me plot the new variable
-```{r, eval=TRUE}
+
+## ---- eval=TRUE----------------------------------------------------------
 library(ggplot2)
 
 base=ggplot(data=fromPy)
 base + geom_histogram(aes(x=dem_FA))
-```
 
-Or:
-```{r}
+
+## ------------------------------------------------------------------------
 base + geom_boxplot(aes(y=dem_FA))
-```
 
 
-Let me see some evaluation measures of our index for democracy:
-
-```{r}
+## ------------------------------------------------------------------------
 evalCFA1=parameterEstimates(fitNUM, standardized =TRUE)
-```
 
-* Loadings
-```{r,echo=FALSE}
+
+## ----echo=FALSE----------------------------------------------------------
 evalCFA1[evalCFA1$op=="=~",c('rhs','std.all','pvalue')]
-```
 
-* Some coefficients:
 
-```{r, echo=FALSE}
+## ---- echo=FALSE---------------------------------------------------------
 evalCFA2=as.list(fitMeasures(fitNUM))
-```
 
-* You want p.value greater than 0.05:
 
-```{r}
+## ------------------------------------------------------------------------
 evalCFA2[c("chisq", "df", "pvalue")] 
-```
 
-* You want the Tucker-Lewis > 0.9:
 
-```{r,echo=FALSE}
+## ----echo=FALSE----------------------------------------------------------
 evalCFA2$tli # > 0.90
-```
 
-* You want RMSEA < 0.05:
 
-```{r,echo=FALSE}
+## ----echo=FALSE----------------------------------------------------------
 evalCFA2[c( 'rmsea.ci.lower','rmsea','rmsea.ci.upper')] 
-```
 
-You can see how it looks:
 
-```{r, echo=FALSE}
+## ---- echo=FALSE---------------------------------------------------------
 library(semPlot)
 semPaths(fitNUM, what='std', nCharNodes=10, sizeMan=8,
          edge.label.cex=1.5, fade=T,residuals = F)
-```
 
-## Unsupervised ML: Clustering via partitioning
 
-### Part 1: Preparing data
-
-**a.** Subset the data frame:
-
-```{r}
+## ------------------------------------------------------------------------
 dfClus=fromPy[,c(2,13,16)]
-```
 
 
-**b.** Rename the rows:
-```{r}
+## ------------------------------------------------------------------------
 #from
 head(dfClus)
-```
 
-```{r}
+
+## ------------------------------------------------------------------------
 #to
 row.names(dfClus)=fromPy$Country
 head(dfClus)
-```
-
-**c.** Keep only complete data:
 
 
-```{r}
+## ------------------------------------------------------------------------
 dfClus=dfClus[complete.cases(dfClus),]
-```
 
 
-**d.** Decide distance method and compute distance matrix:
-```{r}
+## ------------------------------------------------------------------------
 library(cluster)
 dfClus_D=cluster::daisy(x=dfClus,metric="gower")
-```
 
 
-### Part 2: Clustering process
-
-### 1. Apply function: you need to indicate the amount of clusters required.
-
-```{r}
+## ------------------------------------------------------------------------
 set.seed(123)
 numberOfClusters=4
 res.pam = pam(x=dfClus_D,k = numberOfClusters,cluster.only = F)
-```
 
 
-### 2. Save clustering results. 
-
-```{r}
+## ------------------------------------------------------------------------
 fromPy$pam=as.factor(res.pam$clustering)
-```
 
-You can see who are the members:
 
-```{r}
+## ------------------------------------------------------------------------
 fromPy[fromPy$pam==1,'Country']
-```
 
-You can request belonging:
 
-```{r}
+## ------------------------------------------------------------------------
 fromPy[fromPy$Country=="Peru",'pam']
-```
 
 
-### 3. Evaluate Results.
-
-**3.a** Global Report
-
-
-```{r}
+## ------------------------------------------------------------------------
 pamEval=as.data.frame.array(silhouette(res.pam))
 pamEval$country=row.names(pamEval)
 row.names(pamEval)=NULL
 aggregate(data=pamEval,sil_width~cluster,FUN=mean)
-```
 
 
-
-**3.b** Individual report
-
-```{r}
+## ------------------------------------------------------------------------
 head(pamEval)
-```
 
-**3.c** Detecting anomalies
 
-```{r}
+## ------------------------------------------------------------------------
 pamEval[pamEval$sil_width<0,]
-```
 
-```{r}
+
+## ------------------------------------------------------------------------
 pamEval_O=pamEval[order(pamEval$cluster,pamEval$sil_width),]
-```
 
-```{r}
+
+## ------------------------------------------------------------------------
 clusterVal=1
 pamEval=pamEval_O[pamEval_O$cluster==clusterVal,]
 
@@ -369,8 +251,8 @@ sil1= sil1 + theme(axis.text.x = element_text(angle = 80,
                                               size = 6,
                                               hjust = 1))
 sil1
-```
-```{r}
+
+## ------------------------------------------------------------------------
 clusterVal=2
 pamEval=pamEval_O[pamEval_O$cluster==clusterVal,]
 
@@ -384,24 +266,15 @@ sil2= sil2 + theme(axis.text.x = element_text(angle = 80,
                                               hjust = 1))
 sil2= sil2 + labs(x=NULL)
 sil2
-```
 
-```{r}
+
+## ------------------------------------------------------------------------
 library(ggpubr)
 
 ggarrange(sil1,sil2,ncol = 1)
-```
 
-We should see how the world likes like based on democracy clusters, follow this steps:
 
-a. Download the world map from [here](https://github.com/eScienceUW-WinterSchool-2020/RSession/raw/master/map/world_map.zip).
-b. Unzip the file you downloaded in a folder.
-c. Upload the unzipped files into [MAPSHAPER](https://mapshaper.org/). No need to uplod the text file.
-d. Transform the map into a TOPOJSON format. Save the topojson into your computer.
-e. Get a github account. Create a repository and upload the topojson file.
-f. Get the download link and use it in the next code.
-
-```{r}
+## ------------------------------------------------------------------------
 # installed?
 #library(sp)
 #library(geojsonio)
@@ -411,37 +284,27 @@ fromGit="https://github.com/eScienceUW-WinterSchool-2020/RSession/raw/master/map
 
 
 mapWorld <- rgdal::readOGR(fromGit,stringsAsFactors = FALSE)
-```
 
 
-We have the map:
-
-```{r, eval=TRUE}
+## ---- eval=TRUE----------------------------------------------------------
 plot(mapWorld)
-```
 
-The plan is to color the countries according to a group, which will result from clustering. 
 
-```{r, eval=TRUE}
+## ---- eval=TRUE----------------------------------------------------------
 # see data in map
 head(mapWorld@data)
-```
 
-Let's add our data to the map data:
 
-```{r, eval=TRUE}
+## ---- eval=TRUE----------------------------------------------------------
 mapWorldAll=merge(mapWorld, #map first
                    fromPy, 
                    by.x='NAME', # common column
                    by.y='Country', # common column
                    all.x=F) # reduced map.
 
-```
 
 
-Now paint the world (get colors from [here](http://colorbrewer2.org/)):
-
-```{r, eval=TRUE}
+## ---- eval=TRUE----------------------------------------------------------
 # what:
 varToPlot=mapWorldAll$pam
 
@@ -464,13 +327,9 @@ legend('left', legend = c("TOP","GOOD","BAD","POOR"),
        cex = 0.6, 
        bty = "n",
        title="Clusters")
-```
 
-## Regression
 
-This may be the easiest functions:
-
-```{r}
+## ------------------------------------------------------------------------
 # hypothesis 1:
 
 # The more democratic and the better HDI 
@@ -479,22 +338,19 @@ This may be the easiest functions:
 #row.names(fromPy)=fromPy$Country
 hypo1=formula(co2_in_MT~ dem_FA + Humandevelopmentindex + Continent)
 regre1=glm(hypo1,data = fromPy,family = 'gaussian')
-```
 
-```{r}
+
+## ------------------------------------------------------------------------
 summary(regre1)
-```
 
-```{r}
+
+## ------------------------------------------------------------------------
 library(sjPlot)
 
 plot_models(regre1,vline.color = "grey")
-```
 
 
-
-
-```{r}
+## ------------------------------------------------------------------------
 # hypothesis 2:
 
 # The democracy and level of contamination
@@ -503,34 +359,30 @@ plot_models(regre1,vline.color = "grey")
 
 hypo2=formula(HDIdico~ dem_FA + co2_in_MT + Continent)
 regre2=glm(hypo2,data = fromPy,family = "binomial")
-```
 
-```{r}
+
+## ------------------------------------------------------------------------
 summary(regre2)
-```
 
 
-```{r}
+## ------------------------------------------------------------------------
 # interpracion usando marginal effects:
 library(margins)
 # 
 (model = margins(regre2))
-```
-```{r}
+
+## ------------------------------------------------------------------------
 (margins=summary(model))
-```
 
 
-```{r}
+## ------------------------------------------------------------------------
 
 base= ggplot(margins,aes(x=factor, y=AME)) + geom_point()
 plot2 = base + theme(axis.text.x = element_text(angle = 80,
                                               size = 6,
                                               hjust = 1))
 plot2    
-```
-```{r}
-plot2 +  geom_errorbar(aes(ymin=lower, ymax=upper))
-```
 
+## ------------------------------------------------------------------------
+plot2 +  geom_errorbar(aes(ymin=lower, ymax=upper))
 
