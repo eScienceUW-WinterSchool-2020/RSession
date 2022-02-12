@@ -103,6 +103,7 @@ The average HDI per continent:
 ```{r}
 aggregate(data=fromPy,Humandevelopmentindex ~ Continent,FUN=mean)
 ```
+
 ```{r}
 fromPy%>%
     group_by(Continent) %>% 
@@ -119,6 +120,7 @@ aggregate(data=fromPy,
           FUN=median)
 
 ```
+
 ```{r}
 aggregate(data=fromPy[,c(8:12,14)],.~Continent,FUN=median)
 ```
@@ -143,8 +145,9 @@ fromPy$HDIdico=ifelse(fromPy$Humandevelopmentindex>
 A new data frame:
 ```{r}
 fromPy%>%
-    mutate(HDIdico = ifelse(Humandevelopmentindex>median(Humandevelopmentindex),
-                            1, 0))%>%
+    mutate(HDIdico =
+               ifelse(Humandevelopmentindex >
+                          median(Humandevelopmentindex),1, 0))%>%
     select(Country,HDIdico)
 ```
 
@@ -156,6 +159,7 @@ You would like turn the 5 dimensions into one, without following an arithmetic a
 
 
 Let me subset our original data frame:
+
 ```{r, eval=TRUE}
 subDemo=fromPy[,c(8:12)]
 ```
